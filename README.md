@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # TaskHub
 
 A full-stack task manager: a plain **HTML + Tailwind CSS + vanilla JavaScript** frontend talking to a **Node.js (ESM) + Express** REST API backed by **Microsoft SQL Server**.
@@ -205,3 +206,7 @@ curl -X DELETE http://localhost:5000/api/tasks/<id>
 | Red banner "Unable to reach the TaskHub API" | Backend not running, or the `taskhub-api-base` meta tag points to the wrong URL. |
 | CORS error in the browser console | Add the frontend origin to `CORS_ORIGIN` (or use `*`). |
 
+=======
+# task-hub-plain
+ A full-stack task manager: a plain **HTML + Tailwind CSS + vanilla JavaScript** frontend talking to a **Node.js (ESM) + Express** REST API backed by **Microsoft SQL Server**.
+>>>>>>> 6bf1f0f70f0e221a37a0eb9d5a467391f957da52
