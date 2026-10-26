@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en" class="scheme-light-dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="TaskHub — a simple, fast task manager." />
+    <!-- Base URL of the TaskHub REST API. Change this if the backend runs elsewhere. -->
+    <meta name="taskhub-api-base" content="http://localhost:5000/api" />
+    <title>TaskHub</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%234f46e5'/%3E%3Cpath d='M7 12.5l3 3 7-7' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+    <!-- Tailwind CSS v4 (browser build) — all styling is done with utility classes. -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body class="min-h-screen bg-slate-50 text-[15px] leading-normal text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100">
+    <a
+      href="#task-list"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-lg focus:bg-indigo-600 focus:px-4 focus:py-2 focus:text-white"
+    >Skip to tasks</a>
+
+    <!-- Header -->
+    <header class="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+      <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-5">
+        <div class="flex items-center gap-3">
+          <span class="grid size-10 place-items-center rounded-[11px] bg-linear-to-br from-indigo-500 via-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/35" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="size-[22px]" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 12.5l3.5 3.5 7.5-8" /></svg>
+          </span>
+          <div>
+            <h1 class="text-xl font-bold tracking-tight">TaskHub</h1>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Plan it. Track it. Done.</p>
+          </div>
+        </div>
+        <p id="stats" class="hidden text-right text-sm text-slate-500 sm:block dark:text-slate-400" aria-live="polite"></p>
+      </div>
+    </header>
+
+    <!-- API / network error banner -->
+    <div id="error-banner" role="alert" class="border-b border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400" hidden>
+      <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap sm:px-5">
+        <svg viewBox="0 0 24 24" class="size-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" />
+        </svg>
+        <p id="error-banner-message" class="flex-1 font-medium">Unable to reach the TaskHub API.</p>
+        <button
+          type="button"
+          id="error-banner-retry"
+          class="cursor-pointer rounded-lg border border-current/35 bg-white px-3 py-1.5 text-sm font-semibold transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-red-500/40 dark:bg-slate-900 dark:hover:bg-slate-800"
+        >Retry</button>
+        <button
+          type="button"
+          id="error-banner-close"
+          aria-label="Dismiss error"
+          class="inline-grid size-[34px] cursor-pointer place-items-center rounded-lg transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-red-500/40 dark:hover:bg-red-500/15"
+        >
+          <svg viewBox="0 0 24 24" class="size-[18px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </button>
+      </div>
+    </div>
+
+    <main class="mx-auto grid max-w-6xl items-start gap-6 px-4 pt-6 pb-12 sm:px-5 lg:grid-cols-[340px_minmax(0,1fr)]">
+      <!-- Create task -->
+      <section aria-labelledby="create-heading" class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-6 dark:border-slate-800 dark:bg-slate-900">
+        <h2 id="create-heading" class="mb-4 text-base font-semibold">New task</h2>
+        <form id="create-form" class="flex flex-col gap-4" novalidate>
+          <div class="flex flex-col gap-1.5">
+            <div class="flex items-baseline justify-between">
+              <label for="create-title" class="text-sm font-semibold">Title</label>
+              <span id="create-title-counter" class="text-xs text-slate-500 tabular-nums dark:text-slate-400 [&.is-near-limit]:text-amber-600 dark:[&.is-near-limit]:text-amber-400" aria-hidden="true">0/255</span>
+            </div>
+            <input
+              id="create-title"
+              name="title"
+              type="text"
+              maxlength="255"
+              autocomplete="off"
+              placeholder="e.g. Write project proposal"
+              aria-describedby="create-title-error"
+              required
+              class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 transition placeholder:text-slate-400 hover:border-indigo-300 focus:border-indigo-500 focus:ring-3 focus:ring-indigo-500/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-red-500 aria-invalid:focus:ring-red-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-indigo-500/60"
+            />
+            <p id="create-title-error" class="text-xs text-red-600 empty:hidden dark:text-red-400" aria-live="polite"></p>
+          </div>
+
+          <div class="flex flex-col gap-1.5">
+            <label for="create-description" class="text-sm font-semibold">Description</label>
+            <textarea
+              id="create-description"
+              name="description"
+              rows="4"
+              maxlength="10000"
+              placeholder="Add some details…"
+              aria-describedby="create-description-error"
+              required
+              class="min-h-24 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 transition placeholder:text-slate-400 hover:border-indigo-300 focus:border-indigo-500 focus:ring-3 focus:ring-indigo-500/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-red-500 aria-invalid:focus:ring-red-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-indigo-500/60"
+            ></textarea>
+            <p id="create-description-error" class="text-xs text-red-600 empty:hidden dark:text-red-400" aria-live="polite"></p>
+          </div>
+
+          <p id="create-form-error" role="alert" class="rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400" hidden></p>
+
+          <button
+            type="submit"
+            id="create-submit"
+            class="group inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 leading-tight font-semibold text-white transition select-none hover:bg-indigo-700 focus-visible:ring-3 focus-visible:ring-indigo-500/40 focus-visible:outline-none active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+          >
+            <span class="hidden size-4 animate-spin rounded-full border-2 border-current/30 border-t-current group-[.is-loading]:inline-block" aria-hidden="true"></span>
+            <span class="btn__label">Add task</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- Task list -->
+      <section aria-labelledby="tasks-heading" class="flex min-w-0 flex-col gap-4">
+        <div class="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm max-sm:flex-col max-sm:items-stretch dark:border-slate-800 dark:bg-slate-900">
+          <h2 id="tasks-heading" class="sr-only">Tasks</h2>
+
+          <div class="relative flex-[1_1_240px] max-sm:flex-auto">
+            <svg viewBox="0 0 24 24" class="pointer-events-none absolute top-1/2 left-3 size-[18px] -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
+            </svg>
+            <label for="search-input" class="sr-only">Search tasks by title</label>
+            <input
+              id="search-input"
+              type="search"
+              placeholder="Search by title…"
+              autocomplete="off"
+              maxlength="255"
+              class="w-full rounded-lg border border-slate-300 bg-white py-2.5 pr-10 pl-10 text-slate-900 transition placeholder:text-slate-400 hover:border-indigo-300 focus:border-indigo-500 focus:ring-3 focus:ring-indigo-500/30 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-indigo-500/60 [&::-webkit-search-cancel-button]:hidden"
+            />
+            <button
+              type="button"
+              id="search-clear"
+              aria-label="Clear search"
+              class="absolute top-1/2 right-1.5 inline-grid size-7 -translate-y-1/2 cursor-pointer place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-3 focus-visible:ring-indigo-500/40 focus-visible:outline-none dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+              hidden
+            >
+              <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            </button>
+          </div>
+
+          <div
+            id="filter-tabs"
+            role="tablist"
+            aria-label="Filter tasks by status"
+            class="inline-flex gap-0.5 rounded-[10px] border border-slate-200 bg-slate-100 p-[3px] max-sm:grid max-sm:grid-cols-3 dark:border-slate-800 dark:bg-slate-800/60"
+          >
+            <button type="button" role="tab" data-status="all" aria-selected="true"
+              class="cursor-pointer rounded-[7px] px-3.5 py-1.5 text-sm font-semibold text-slate-500 transition hover:text-slate-900 focus-visible:ring-3 focus-visible:ring-indigo-500/40 focus-visible:outline-none aria-selected:bg-white aria-selected:text-indigo-600 aria-selected:shadow-sm aria-selected:ring-1 aria-selected:ring-slate-200 dark:text-slate-400 dark:hover:text-slate-100 dark:aria-selected:bg-slate-900 dark:aria-selected:text-indigo-400 dark:aria-selected:ring-slate-700">All</button>
+            <button type="button" role="tab" data-status="incomplete" aria-selected="false" tabindex="-1"
+              class="cursor-pointer rounded-[7px] px-3.5 py-1.5 text-sm font-semibold text-slate-500 transition hover:text-slate-900 focus-visible:ring-3 focus-visible:ring-indigo-500/40 focus-visible:outline-none aria-selected:bg-white aria-selected:text-indigo-600 aria-selected:shadow-sm aria-selected:ring-1 aria-selected:ring-slate-200 dark:text-slate-400 dark:hover:text-slate-100 dark:aria-selected:bg-slate-900 dark:aria-selected:text-indigo-400 dark:aria-selected:ring-slate-700">Incomplete</button>
+            <button type="button" role="tab" data-status="completed" aria-selected="false" tabindex="-1"
+              class="cursor-pointer rounded-[7px] px-3.5 py-1.5 text-sm font-semibold text-slate-500 transition hover:text-slate-900 focus-visible:ring-3 focus-visible:ring-indigo-500/40 focus-visible:outline-none aria-selected:bg-white aria-selected:text-indigo-600 aria-selected:shadow-sm aria-selected:ring-1 aria-selected:ring-slate-200 dark:text-slate-400 dark:hover:text-slate-100 dark:aria-selected:bg-slate-900 dark:aria-selected:text-indigo-400 dark:aria-selected:ring-slate-700">Completed</button>
+          </div>
+        </div>
+
+        <div id="list-region" aria-busy="false" class="relative min-h-[200px] [&[aria-busy=true]>ul]:opacity-60">
+          <div id="list-progress" class="absolute inset-x-0 -top-2.5 h-[3px] animate-pulse rounded-full bg-indigo-500" hidden aria-hidden="true"></div>
+
+          <div id="loading-state" class="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center text-slate-500 dark:text-slate-400" hidden>
+            <span class="size-8 animate-spin rounded-full border-3 border-indigo-500/20 border-t-indigo-600 dark:border-t-indigo-400" aria-hidden="true"></span>
+            <p>Loading tasks…</p>
+          </div>
+
+          <div id="empty-state" class="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-200 bg-white px-6 py-14 text-center text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400" hidden>
+            <svg viewBox="0 0 24 24" class="size-12 text-slate-300 dark:text-slate-700" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" />
+            </svg>
+            <h3 id="empty-title" class="text-lg font-semibold text-slate-900 dark:text-slate-100">No tasks yet</h3>
+            <p id="empty-text" class="max-w-[34ch]">Create your first task using the form.</p>
+            <button
+              type="button"
+              id="empty-reset"
+              class="inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 focus-visible:ring-3 focus-visible:ring-indigo-500/40 focus-visible:outline-none dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800"
+              hidden
+            >Clear filters</button>
+          </div>
+
+          <ul id="task-list" aria-label="Task list" class="flex flex-col gap-3 transition-opacity"></ul>
+        </div>
+      </section>
+    </main>
+
+    <!-- Task card template (state classes is-completed / is-busy / is-leaving are toggled by app.js) -->
+    <template id="task-template">
+      <li class="task group grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3.5 rounded-xl border border-l-4 border-slate-200 border-l-amber-500 bg-white p-4 shadow-sm transition duration-200 hover:shadow-md max-sm:grid-cols-[auto_minmax(0,1fr)] motion-reduce:transition-none starting:translate-y-1.5 starting:opacity-0 dark:border-slate-800 dark:border-l-amber-400 dark:bg-slate-900 [&.is-busy]:pointer-events-none [&.is-busy]:opacity-60 [&.is-completed]:border-l-green-600 dark:[&.is-completed]:border-l-green-400 [&.is-leaving]:scale-[0.98] [&.is-leaving]:opacity-0">
+        <label class="relative mt-0.5 inline-grid cursor-pointer place-items-center">
+          <input type="checkbox" class="task__checkbox peer absolute inset-0 m-0 size-full cursor-pointer opacity-0" />
+          <span class="grid size-[22px] place-items-center rounded-full border-2 border-slate-300 text-transparent transition peer-checked:border-green-600 peer-checked:bg-green-600 peer-checked:text-white peer-hover:border-green-600 peer-focus-visible:ring-3 peer-focus-visible:ring-indigo-500/40 dark:border-slate-600 dark:peer-checked:border-green-500 dark:peer-checked:bg-green-500 dark:peer-checked:text-slate-950" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="size-3.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+          </span>
+        </label>
+
+        <div class="flex min-w-0 flex-col gap-1.5">
+          <div class="flex flex-wrap items-center gap-2">
+            <h3 class="task__title text-base font-semibold break-words group-[.is-completed]:text-slate-400 group-[.is-completed]:line-through dark:group-[.is-completed]:text-slate-500"></h3>
+            <span class="task__badge inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-[0.7rem] font-bold tracking-wide text-amber-700 uppercase before:size-1.5 before:rounded-full before:bg-current group-[.is-completed]:bg-green-100 group-[.is-completed]:text-green-700 dark:bg-amber-500/15 dark:text-amber-400 dark:group-[.is-completed]:bg-green-500/15 dark:group-[.is-completed]:text-green-400"></span>
+          </div>
+          <p class="task__description line-clamp-4 break-words whitespace-pre-wrap text-slate-600 dark:text-slate-400"></p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            <span>Created <time class="task__created tabular-nums"></time></span>
+            <span class="task__updated-wrap" hidden> · Updated <time class="task__updated tabular-nums"></time></span>
+          </p>
+        </div>
+
+        <div class="flex gap-0.5 max-sm:col-span-full max-sm:-mt-1.5 max-sm:justify-end">
+          <button type="button" data-action="edit"
+            class="inline-grid size-[34px] cursor-pointer place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-3 focus-visible:ring-indigo-500/40 focus-visible:outline-none dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100">
+            <svg viewBox="0 0 24 24" class="size-[18px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" /></svg>
+          </button>
+          <button type="button" data-action="delete"
+            class="inline-grid size-[34px] cursor-pointer place-items-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 focus-visible:ring-3 focus-visible:ring-indigo-500/40 focus-visible:outline-none dark:text-slate-400 dark:hover:bg-red-500/15 dark:hover:text-red-400">
+            <svg viewBox="0 0 24 24" class="size-[18px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>
+          </button>
+        </div>
+      </li>
+    </template>
+
+    <!-- Edit task modal -->
+    <dialog
+      id="edit-dialog"
+      aria-labelledby="edit-heading"
+      class="m-auto max-h-[calc(100vh-2rem)] w-[min(560px,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl transition duration-150 backdrop:bg-slate-950/55 backdrop:backdrop-blur-[2px] motion-reduce:transition-none starting:translate-y-2 starting:opacity-0 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+    >
+      <form id="edit-form" novalidate>
+        <header class="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+          <h2 id="edit-heading" class="text-lg font-semibold">Edit task</h2>
+          <button type="button" data-close aria-label="Close"
+            class="inline-grid size-[34px] cursor-pointer place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-3 focus-visible:ring-indigo-500/40 focus-visible:outline-none dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100">
+            <svg viewBox="0 0 24 24" class="size-[18px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </header>
+
+        <div class="flex flex-col gap-4 p-5">
+          <div class="flex flex-col gap-1.5">
+            <div class="flex items-baseline justify-between">
+              <label for="edit-title" class="text-sm font-semibold">Title</label>
+              <span id="edit-title-counter" class="text-xs text-slate-500 tabular-nums dark:text-slate-400 [&.is-near-limit]:text-amber-600 dark:[&.is-near-limit]:text-amber-400" aria-hidden="true">0/255</span>
+            </div>
+            <input
+              id="edit-title"
+              name="title"
+              type="text"
+              maxlength="255"
+              autocomplete="off"
+              aria-describedby="edit-title-error"
+              required
+              class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 transition placeholder:text-slate-400 hover:border-indigo-300 focus:border-indigo-500 focus:ring-3 focus:ring-indigo-500/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-red-500 aria-invalid:focus:ring-red-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-indigo-500/60"
+            />
+            <p id="edit-title-error" class="text-xs text-red-600 empty:hidden dark:text-red-400" aria-live="polite"></p>
+          </div>
+
+          <div class="flex flex-col gap-1.5">
+            <label for="edit-description" class="text-sm font-semibold">Description</label>
+            <textarea
+              id="edit-description"
+              name="description"
+              rows="6"
+              maxlength="10000"
+              aria-describedby="edit-description-error"
+              required
+              class="min-h-24 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 transition placeholder:text-slate-400 hover:border-indigo-300 focus:border-indigo-500 focus:ring-3 focus:ring-indigo-500/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-red-500 aria-invalid:focus:ring-red-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-indigo-500/60"
+            ></textarea>
+            <p id="edit-description-error" class="text-xs text-red-600 empty:hidden dark:text-red-400" aria-live="polite"></p>
+          </div>
+
+          <p id="edit-form-error" role="alert" class="rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400" hidden></p>
+        </div>
+
+        <footer class="flex justify-end gap-2 rounded-b-xl border-t border-slate-200 bg-slate-50 px-5 py-3.5 dark:border-slate-800 dark:bg-slate-800/40">
+          <button type="button" data-close
+            class="inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 px-4 py-2.5 leading-tight font-semibold transition hover:bg-white focus-visible:ring-3 focus-visible:ring-indigo-500/40 focus-visible:outline-none max-sm:flex-1 dark:border-slate-700 dark:hover:bg-slate-800">Cancel</button>
+          <button type="submit" id="edit-submit"
+            class="group inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 leading-tight font-semibold text-white transition select-none hover:bg-indigo-700 focus-visible:ring-3 focus-visible:ring-indigo-500/40 focus-visible:outline-none active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 max-sm:flex-1 dark:bg-indigo-500 dark:hover:bg-indigo-400">
+            <span class="hidden size-4 animate-spin rounded-full border-2 border-current/30 border-t-current group-[.is-loading]:inline-block" aria-hidden="true"></span>
+            <span class="btn__label">Save changes</span>
+          </button>
+        </footer>
+      </form>
+    </dialog>
+
+    <!-- Delete confirmation modal -->
+    <dialog
+      id="delete-dialog"
+      aria-labelledby="delete-heading"
+      aria-describedby="delete-text"
+      class="m-auto max-h-[calc(100vh-2rem)] w-[min(420px,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl transition duration-150 backdrop:bg-slate-950/55 backdrop:backdrop-blur-[2px] motion-reduce:transition-none starting:translate-y-2 starting:opacity-0 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+    >
+      <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+        <h2 id="delete-heading" class="text-lg font-semibold">Delete task?</h2>
+      </div>
+      <div class="flex flex-col gap-4 p-5 break-words">
+        <p id="delete-text" class="text-slate-600 dark:text-slate-300">
+          “<strong id="delete-task-title" class="font-semibold text-slate-900 dark:text-slate-100"></strong>” will be permanently deleted. This can’t be undone.
+        </p>
+        <p id="delete-error" role="alert" class="rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400" hidden></p>
+      </div>
+      <footer class="flex justify-end gap-2 rounded-b-xl border-t border-slate-200 bg-slate-50 px-5 py-3.5 dark:border-slate-800 dark:bg-slate-800/40">
+        <button type="button" data-close
+          class="inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 px-4 py-2.5 leading-tight font-semibold transition hover:bg-white focus-visible:ring-3 focus-visible:ring-indigo-500/40 focus-visible:outline-none max-sm:flex-1 dark:border-slate-700 dark:hover:bg-slate-800">Cancel</button>
+        <button type="button" id="delete-confirm"
+          class="group inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 leading-tight font-semibold text-white transition select-none hover:bg-red-700 focus-visible:ring-3 focus-visible:ring-red-500/40 focus-visible:outline-none active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 max-sm:flex-1">
+          <span class="hidden size-4 animate-spin rounded-full border-2 border-current/30 border-t-current group-[.is-loading]:inline-block" aria-hidden="true"></span>
+          <span class="btn__label">Delete</span>
+        </button>
+      </footer>
+    </dialog>
+
+    <!-- Toast notifications -->
+    <div id="toasts" aria-live="polite" class="fixed right-4 bottom-4 z-50 flex max-w-[min(360px,calc(100vw-2rem))] flex-col gap-2"></div>
+  </body>
+</html>
